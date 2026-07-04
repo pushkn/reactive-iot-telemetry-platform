@@ -1,0 +1,1 @@
+rootProject.name = "Reactive_IoT_Telemetry_Platform"

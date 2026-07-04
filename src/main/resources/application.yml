@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: reactive-iot-telemetry
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/telemetry
+    username: telemetry
+    password: telemetry
+
+kafka:
+  bootstrap-servers: localhost:9092
+  topics:
+    raw: sensors.raw
+    alerts: alerts
