@@ -35,3 +35,9 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("runEmulator") {
+    group = "application"
+    mainClass.set("org.example.telemetry.emulator.SensorEmulatorApp")
+    classpath = sourceSets["main"].runtimeClasspath
+}

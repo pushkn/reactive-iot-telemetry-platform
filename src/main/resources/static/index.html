@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Умный завод — мониторинг</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 20px; }
+        h1 { font-size: 20px; }
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .panel { background: #1c1c1c; border-radius: 8px; padding: 16px; }
+        #alerts { list-style: none; padding: 0; margin: 0; max-height: 500px; overflow-y: auto; }
+        #alerts li { padding: 8px; border-bottom: 1px solid #333; color: #ff6b6b; font-size: 13px; }
+        canvas { max-height: 400px; }
+    </style>
+</head>
+<body>
+<h1>Умный завод — мониторинг в реальном времени</h1>
+<div class="grid">
+    <div class="panel">
+        <canvas id="chart"></canvas>
+    </div>
+    <div class="panel">
+        <h3>Алерты (CRITICAL_OVERHEAT)</h3>
+        <ul id="alerts"></ul>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('chart');
+    const maxPoints = 40;
+
+    const datasets = {
+        TEMP: { label: 'TEMP', data: [], borderColor: '#ff9f40' },
+        PRESSURE: { label: 'PRESSURE', data: [], borderColor: '#36a2eb' },
+        VIBRATION: { label: 'VIBRATION', data: [], borderColor: '#4bc0c0' }
+    };
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: Object.values(datasets).map(d => ({
+                label: d.label,
+                data: d.data,
+                borderColor: d.borderColor,
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0
+            }))
+        },
+        options: {
+            animation: false,
+            scales: {
+                x: { ticks: { color: '#888' } },
+                y: { ticks: { color: '#888' } }
+            },
+            plugins: { legend: { labels: { color: '#eee' } } }
+        }
+    });
+
+    let counter = 0;
+
+    const readingsSource = new EventSource('/api/stream/readings');
+    readingsSource.onmessage = (event) => {
+        const reading = JSON.parse(event.data);
+        const bucket = datasets[reading.metricType];
+        if (!bucket) return;
+
+        counter++;
+        if (chart.data.labels.length >= maxPoints) {
+            chart.data.labels.shift();
+            Object.values(datasets).forEach(d => d.data.shift());
+        }
+
+        chart.data.labels.push(counter);
+        Object.keys(datasets).forEach(key => {
+            if (key === reading.metricType) {
+                datasets[key].data.push(reading.value);
+            } else {
+                datasets[key].data.push(datasets[key].data.length ? datasets[key].data[datasets[key].data.length - 1] : null);
+            }
+        });
+
+        chart.update();
+    };
+
+    const alertsSource = new EventSource('/api/stream/alerts');
+    const alertsList = document.getElementById('alerts');
+    alertsSource.onmessage = (event) => {
+        const alert = JSON.parse(event.data);
+        const li = document.createElement('li');
+        const time = new Date(alert.timestamp).toLocaleTimeString();
+        li.textContent = `[${time}] ${alert.deviceId}: ${alert.alertType} (${alert.value.toFixed(1)}°C)`;
+        alertsList.prepend(li);
+        while (alertsList.children.length > 50) {
+            alertsList.removeChild(alertsList.lastChild);
+        }
+    };
+</script>
+</body>
+</html>
